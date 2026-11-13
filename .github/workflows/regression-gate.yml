@@ -1,0 +1,176 @@
+name: Regression gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python_regression:
+    name: python-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned PDF regression runtime
+        run: python -m pip install --disable-pip-version-check reportlab==4.2.5
+
+      - name: Compile Python sources
+        run: python -m compileall -q src tests
+
+      - name: Validate deployed production wrapper
+        run: python tests/validate_deployed_wrapper.py
+
+      - name: Validate runtime/data Git index boundary
+        run: python tests/validate_git_index_boundary.py
+
+      - name: Prepare CI-only reference presence fixtures
+        run: python tests/ci_prepare_reference_fixtures.py
+
+      - name: Run full regression in isolated materialized staging
+        run: python tests/ci_run_isolated_regression.py
+
+      - name: Patient input profile self-test
+        run: python src/patient_input_profile.py self-test
+
+      - name: Genotyping-array adapter self-test
+        run: python src/array_vcf_tools.py self-test
+
+      - name: VCF to 23andMe converter self-test
+        run: python src/vcf_23me_converter.py self-test
+
+      - name: Array normalization QC self-test
+        run: python src/array_normalization_qc.py self-test
+
+      - name: Genotype-table TXT profile self-test
+        run: python src/genotype_txt_profile.py self-test
+
+      - name: Genotype-table TXT adapter self-test
+        run: python src/genotype_txt_tools.py self-test
+
+      - name: Stage 24 self-test
+        run: python src/knowledge_enrichment.py self-test
+
+      - name: Clinical risk evidence self-test
+        run: python src/clinical_risk_evidence.py self-test
+
+      - name: Clinical risk report self-test
+        run: python src/genome_report_hotfix15.py self-test
+
+      - name: Clickable TOC report self-test
+        run: python src/genome_report_hotfix16.py self-test
+
+      - name: Open reference manager self-test
+        run: python src/open_reference_manager.py self-test
+
+      - name: Research reference manager self-test
+        run: python src/research_reference_manager.py self-test
+
+  windows_powershell:
+    name: windows-powershell
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Parse deployed PowerShell wrapper
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\dante_wgs_pipeline.ps1
+
+      - name: Parse seeded orchestrator base
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\dante_wgs_pipeline_base_v7.ps1
+
+      - name: Parse version runtime overlay
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\version_runtime.ps1
+
+      - name: Parse report runtime overlay
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\report_runtime.ps1
+
+      - name: Parse clinical risk runtime overlay
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\clinical_risk_runtime.ps1
+
+      - name: Parse array runtime overlay
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\array_profile_runtime.ps1
+
+      - name: Parse array normalization QC overlay
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\array_normalization_qc_runtime.ps1
+
+      - name: Parse genotype-table TXT runtime overlay
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\genotype_txt_profile_runtime.ps1
+
+      - name: Parse generic VCF export runtime overlay
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\vcf_export_runtime.ps1
+
+      - name: Parse bootstrap updater
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\src\bootstrap_update.ps1
+
+      - name: Parse platform selftest scripts
+        shell: powershell
+        run: |
+          .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\tests\Materialize-IsolatedRuntime.ps1
+          .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\tests\Test-WindowsPlatformSelfTest.ps1
+          .\tests\Test-PowerShellSyntax.ps1 -ScriptPath .\tests\Test-GitNativeBootstrap.ps1
+
+      - name: Execute git-native workstation bootstrap selftest
+        shell: powershell
+        run: .\tests\Test-GitNativeBootstrap.ps1
+
+      - name: Materialize production runtime in isolated staging
+        shell: powershell
+        run: .\tests\Materialize-IsolatedRuntime.ps1 -OutputRoot "$env:RUNNER_TEMP\dante-runtime"
+
+      - name: Parse isolated materialized production runtime
+        shell: powershell
+        run: .\tests\Test-PowerShellSyntax.ps1 -ScriptPath "$env:RUNNER_TEMP\dante-runtime\src\.ci_materialized_runtime.ps1"
+
+      - name: Execute Windows production-path selftest
+        shell: powershell
+        run: .\tests\Test-WindowsPlatformSelfTest.ps1
+
+  full_regression:
+    name: full-regression
+    if: always()
+    needs: [python_regression, windows_powershell]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every regression lane to pass
+        shell: bash
+        run: |
+          echo "python-regression: ${{ needs.python_regression.result }}"
+          echo "windows-powershell: ${{ needs.windows_powershell.result }}"
+          if [[ "${{ needs.python_regression.result }}" != "success" || "${{ needs.windows_powershell.result }}" != "success" ]]; then
+            exit 1
+          fi

@@ -1,0 +1,44 @@
+# Patient/genome data and generated outputs
+patients/*
+!patients/README.md
+reference_data/*
+!reference_data/GRCh37_bcftools_ploidy.tsv
+!reference_data/CHESS_2.2_REFERENCE.txt
+annotation_data/
+logs/
+results/
+*.bam
+*.bai
+*.cram
+*.crai
+*.vcf
+*.vcf.gz
+*.bcf
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.sqlite3
+*.db
+*.part
+
+# Local generated migration metadata (contains host-specific absolute paths)
+src/.layout_migration_v8.6.0.json
+
+# Local active-patient selector state
+.active_patient.json
+
+# Local code cache used only by legacy non-Git bootstrap installs
+.pipeline_repo/
+
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.vscode/
+
+# Large/reference artifacts are installed by managers, not stored in Git
+reference_data/CHESS_2.2_genes.tsv
+reference_data/CHESS_2.2_genes.xlsx
