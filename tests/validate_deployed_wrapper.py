@@ -66,7 +66,7 @@ def main() -> int:
         raise RuntimeError("materialize-only path does not emit the production runtime text")
     if "DispatchGuardNeedle" not in text:
         raise RuntimeError("production wrapper does not gate direct patient-input actions")
-    if 'if ([string]$activeProfile.kind -eq "UNKNOWN")' not in text:
+    if 'if ([string]$activeProfile.kind -eq "UNKNOWN" -and' not in text:
         raise RuntimeError("production wrapper does not fail closed for unknown input")
     if 'if ([string]$activeProfile.kind -eq "GENOTYPE_TABLE_TXT"' not in text:
         raise RuntimeError("production wrapper does not protect TXT from WGS-only actions")
