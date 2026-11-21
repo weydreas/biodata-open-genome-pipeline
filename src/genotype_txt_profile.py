@@ -152,18 +152,32 @@ def detect(patient_root: Path) -> dict[str, Any]:
     patient_root = patient_root.resolve()
     input_dir = patient_root / "input"
     input_dir.mkdir(parents=True, exist_ok=True)
+    # Legacy workstations sometimes put the downloaded TXT next to input/,
+    # rather than inside it. Inspect only these two immediate directories:
+    # never recurse into reports, outputs or another patient's workspace.
     candidates = sorted(
-        (p for p in input_dir.iterdir() if p.is_file() and TXT_RE.search(p.name)),
-        key=lambda p: p.name.casefold(),
+        (
+            p
+            for folder in (input_dir, patient_root)
+            for p in folder.iterdir()
+            if p.is_file() and TXT_RE.search(p.name)
+        ),
+        key=lambda p: (p.parent != input_dir, p.name.casefold()),
     )
     matches: list[tuple[Path, dict[str, Any]]] = []
     inspected: list[dict[str, Any]] = []
     for path in candidates:
         kind, detail = classify(path)
-        inspected.append({"file": quick_identity(path), "kind": kind, "inspection": detail})
+        identity = {
+            **quick_identity(path),
+            "location": "input" if path.parent == input_dir else "patient_root",
+        }
+        inspected.append({"file": identity, "kind": kind, "inspection": detail})
         if kind == KIND:
             matches.append((path, detail))
 
+    # Multiple supported inputs are ambiguous, even when they have the same
+    # basename in different directories. Never silently choose a genome.
     if len(matches) == 1:
         source_file, detail = matches[0]
         source = detail.get("source") or "GENOTYPE_TABLE_TXT"
@@ -192,7 +206,10 @@ def detect(patient_root: Path) -> dict[str, Any]:
                 "whole_genome_negative_evidence": False,
                 "sequence_resolved_indels": False,
             },
-            "source_file": quick_identity(source_file),
+            "source_file": {
+                **quick_identity(source_file),
+                "location": "input" if source_file.parent == input_dir else "patient_root",
+            },
             "inspection": detail,
             "txt_candidates": inspected,
         }
