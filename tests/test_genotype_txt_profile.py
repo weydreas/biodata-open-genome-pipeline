@@ -187,7 +187,7 @@ class GenotypeTxtProfileTests(unittest.TestCase):
         # historical materialized WGS script. Its canonical source is checked
         # separately by validate_deployed_wrapper.py before staging.
         if "DispatchGuardNeedle" in wrapper:
-            self.assertIn('if ([string]$activeProfile.kind -eq "UNKNOWN")', wrapper)
+            self.assertIn('if ([string]$activeProfile.kind -eq "UNKNOWN" -and', wrapper)
             self.assertIn('if ([string]$activeProfile.kind -eq "GENOTYPE_TABLE_TXT"', wrapper)
             self.assertIn('"annotsv", "reference-targets"', wrapper)
         else:
