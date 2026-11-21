@@ -18,6 +18,8 @@ cd biodata-open-genome-pipeline
 
 The launcher prepares a patient workspace and opens the interactive menu. Original VCF/FASTQ files belong under `patients/<patient name>/input/`. For example, place a compatible single-sample genotyping-array VCF under `patients/Demo 1/input/`. Do not copy actual patient files into a Git commit or issue.
 
+For 23andMe-style **GRCh37 genotype TXT**, keep the original `.txt`, `.tsv` or compressed `.gz` file: place exactly one supported table in `patients/<patient>/input/` (preferred) or directly in `patients/<patient>/` (legacy placement). The input detector uses the declared build 37 and four tab-separated columns; it refuses ambiguous files. No manual TXT-to-WGS-VCF renaming or conversion is needed. Menu item **2** exports measured loci; item **8** uses the GRCh37 FASTA to create small-variant annotation layers. CNV/SV item **4**, FASTQ and telomere analyses are not available from a genotype table. If the WGS menu appears for this source, verify the local release/deployment and file placement before running any WGS action. Do not commit patient files.
+
 `start.cmd` checks for new commits on a clean `main` checkout. Development work should use feature branches and pull requests. Data files and local settings are excluded via `.gitignore`. Some workflows need GRCh37 references, VEP caches, ClinVar, and optional knowledge resources; use the relevant menu entries to install them.
 
 ## Supported analysis scope
