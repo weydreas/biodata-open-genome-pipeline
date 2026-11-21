@@ -70,6 +70,8 @@ def main() -> int:
         raise RuntimeError("production wrapper does not fail closed for unknown input")
     if 'if ([string]$activeProfile.kind -eq "GENOTYPE_TABLE_TXT"' not in text:
         raise RuntimeError("production wrapper does not protect TXT from WGS-only actions")
+    if '$Mode -in @("rsid", "prepare-small", "stage1", "local-all")' not in text:
+        raise RuntimeError("unknown-input guard must preserve partial-WGS independent tasks")
 
     print(
         "PRODUCTION WRAPPER PASS | manifest-backed WGS version + version -> report -> clinical risk -> array profile -> array normalization QC -> genotype TXT -> generic VCF -> environment init; isolated materialization enabled"
