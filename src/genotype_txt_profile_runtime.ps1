@@ -70,7 +70,18 @@ function Get-GenotypeTxtSourceFile {
     }
     $name = [string]$profile.source_file.name
     if (-not $name) { throw "Genotype-table TXT profile has no source-file identity." }
-    $path = Join-Path $PatientInput $name
+    # Accept both legacy patient-root placement and the standard input/ folder.
+    # Resolve only the detector's explicit, allowlisted source location.
+    $location = "input"
+    if ($profile.source_file.PSObject.Properties.Name -contains "location") {
+        $location = [string]$profile.source_file.location
+    }
+    switch ($location) {
+        "input" { $sourceDirectory = $PatientInput }
+        "patient_root" { $sourceDirectory = $PatientRoot }
+        default { throw "Unsupported genotype-table source location: $location" }
+    }
+    $path = Join-Path $sourceDirectory $name
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Genotype-table TXT source is missing: $path"
     }
