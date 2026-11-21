@@ -64,6 +64,14 @@ def main() -> int:
         raise RuntimeError("materialize-only mode must require an explicit output path")
     if "Set-Content -LiteralPath $materialized -Value $Text" not in text:
         raise RuntimeError("materialize-only path does not emit the production runtime text")
+    if "DispatchGuardNeedle" not in text:
+        raise RuntimeError("production wrapper does not gate direct patient-input actions")
+    if 'if ([string]$activeProfile.kind -eq "UNKNOWN" -and' not in text:
+        raise RuntimeError("production wrapper does not fail closed for unknown input")
+    if 'if ([string]$activeProfile.kind -eq "GENOTYPE_TABLE_TXT"' not in text:
+        raise RuntimeError("production wrapper does not protect TXT from WGS-only actions")
+    if '$Mode -in @("rsid", "prepare-small", "stage1", "local-all")' not in text:
+        raise RuntimeError("unknown-input guard must preserve partial-WGS independent tasks")
 
     print(
         "PRODUCTION WRAPPER PASS | manifest-backed WGS version + version -> report -> clinical risk -> array profile -> array normalization QC -> genotype TXT -> generic VCF -> environment init; isolated materialization enabled"

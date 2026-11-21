@@ -127,6 +127,30 @@ $DoneReplacement = @'
 if (-not $Text.Contains($DoneNeedle)) { throw "Cannot locate Done-message insertion point for reports" }
 $Text = $Text.Replace($DoneNeedle, $DoneReplacement)
 
+# A direct -Mode invocation bypasses Select-Mode, so enforce the same source
+# boundaries before dispatch. An unknown profile must never fall through into
+# WGS-only actions, and TXT cannot imply CNV/SV/FASTQ evidence.
+$DispatchGuardNeedle = '    if ($Mode -eq "menu") { $Mode = Select-Mode }'
+$DispatchGuardReplacement = @'
+    if ($Mode -ne "menu" -and $Mode -notin @("exit", "setup-vep-cache", "setup-annotsv", "setup-fasta", "setup-clinvar", "open-reference", "research-reference")) {
+        $activeProfile = Get-DanteInputProfile
+        # Keep independent FASTQ/CNV/SV and resume-only WGS commands available
+        # for deliberately incomplete WGS bundles; gate only actions whose
+        # entry path necessarily requires the missing RAW/small-variant VCF.
+        if ([string]$activeProfile.kind -eq "UNKNOWN" -and $Mode -in @("rsid", "prepare-small", "stage1", "local-all")) {
+            if (-not (($Mode -eq "rsid") -and (Test-IsGenericSingleVcfProfile))) {
+                throw "No supported small-variant input detected. Provide one GRCh37 23andMe-style TXT in input/ or patient root, or a compatible RAW/array VCF."
+            }
+        }
+        if ([string]$activeProfile.kind -eq "GENOTYPE_TABLE_TXT" -and $Mode -in @("annotsv", "reference-targets", "reference-source-merge", "reference-align", "reference-call", "reference-export", "stage3", "telomere", "genome-browser")) {
+            throw "This action requires WGS/FASTQ or structural-variant evidence and is unavailable for genotype-table TXT."
+        }
+    }
+    if ($Mode -eq "menu") { $Mode = Select-Mode }
+'@
+if (-not $Text.Contains($DispatchGuardNeedle)) { throw "Cannot locate the runtime patient-input dispatch gate" }
+$Text = $Text.Replace($DispatchGuardNeedle, $DispatchGuardReplacement)
+
 # CI/package validation can request the exact production materialization without
 # executing patient initialization or any genomic workload. The caller must supply
 # an explicit output path; the normal production path below remains unchanged.

@@ -176,6 +176,34 @@ function Show-AutomaticCheck {
 
 function Select-Mode {
     if (-not (Test-IsGenericSingleVcfProfile)) {
+        $profile = Get-DanteInputProfile
+        if ([string]$profile.kind -eq "UNKNOWN") {
+            # Do not display the WGS-only menu for an unrecognized genotype file.
+            # Reference installation remains possible before data are imported.
+            Write-Step "Patient input is not recognized"
+            Write-Host "No supported VCF or unique GRCh37 genotype-table TXT was detected." -ForegroundColor Yellow
+            Write-Host "Place one 23andMe-style .txt/.tsv (or .gz) in:" -ForegroundColor Cyan
+            Write-Host "  $PatientInput"
+            Write-Host "or directly in:"
+            Write-Host "  $PatientRoot"
+            Write-Host "TXT requires a GRCh37/build 37 header and tab-separated rsid, chromosome, position, genotype columns." -ForegroundColor Yellow
+            Write-Host "If TXT is present, check for multiple candidate files or update the pipeline to the current release." -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host ("Dante genomic pipeline v{0}" -f (Get-DanteDisplayVersion)) -ForegroundColor Cyan
+            Write-Host "Reference setup (safe without patient variant inputs):" -ForegroundColor DarkCyan
+            Write-MenuItem "1" "Install/resume VEP 116 GRCh37 cache" (Get-VepCacheMenuStatus)
+            Write-MenuItem "6" "Install GRCh37 reference FASTA" $(if (Test-FastaReady) { "READY" } else { "MISSING" })
+            Write-MenuItem "7" "Install/update ClinVar GRCh37" $(if (Test-ClinVarReady) { "READY" } else { "MISSING" })
+            Write-MenuItem "0" "Exit"
+            $choice = Read-Host "Select"
+            switch ($choice) {
+                "1" { return "setup-vep-cache" }
+                "6" { return "setup-fasta" }
+                "7" { return "setup-clinvar" }
+                "0" { return "exit" }
+                default { throw "No recognized patient input: only reference setup is available." }
+            }
+        }
         return (& $script:DantePreVcfSelectMode)
     }
 
