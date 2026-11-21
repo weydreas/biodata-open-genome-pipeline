@@ -134,9 +134,12 @@ $DispatchGuardNeedle = '    if ($Mode -eq "menu") { $Mode = Select-Mode }'
 $DispatchGuardReplacement = @'
     if ($Mode -ne "menu" -and $Mode -notin @("exit", "setup-vep-cache", "setup-annotsv", "setup-fasta", "setup-clinvar", "open-reference", "research-reference")) {
         $activeProfile = Get-DanteInputProfile
-        if ([string]$activeProfile.kind -eq "UNKNOWN") {
+        # Keep independent FASTQ/CNV/SV and resume-only WGS commands available
+        # for deliberately incomplete WGS bundles; gate only actions whose
+        # entry path necessarily requires the missing RAW/small-variant VCF.
+        if ([string]$activeProfile.kind -eq "UNKNOWN" -and $Mode -in @("rsid", "prepare-small", "stage1", "local-all")) {
             if (-not (($Mode -eq "rsid") -and (Test-IsGenericSingleVcfProfile))) {
-                throw "No supported patient input detected. Provide one GRCh37 23andMe-style TXT in input/ or patient root, or a supported VCF. WGS actions cannot run on unknown input."
+                throw "No supported small-variant input detected. Provide one GRCh37 23andMe-style TXT in input/ or patient root, or a compatible RAW/array VCF."
             }
         }
         if ([string]$activeProfile.kind -eq "GENOTYPE_TABLE_TXT" -and $Mode -in @("annotsv", "reference-targets", "reference-source-merge", "reference-align", "reference-call", "reference-export", "stage3", "telomere", "genome-browser")) {
