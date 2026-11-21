@@ -69,6 +69,45 @@ class GenotypeTxtProfileTests(unittest.TestCase):
         self.assertEqual(txt["assembly"], "GRCh37")
         self.assertFalse(txt["capabilities"]["whole_genome_negative_evidence"])
         self.assertFalse(txt["capabilities"]["sequence_resolved_indels"])
+        self.assertEqual(txt["source_file"]["location"], "input")
+
+    def test_txt_downloaded_next_to_input_is_detected_without_moving_data(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            patient = Path(directory)
+            source = patient / "genotype_export.txt"
+            write_txt(source)
+            profile = gtp.detect(patient)
+            self.assertEqual(profile["kind"], gtp.KIND)
+            self.assertEqual(profile["source_file"]["name"], source.name)
+            self.assertEqual(profile["source_file"]["location"], "patient_root")
+            self.assertEqual(len(profile["txt_candidates"]), 1)
+            self.assertTrue((patient / "input").is_dir())
+            self.assertTrue(source.is_file())
+
+    def test_two_valid_txt_sources_are_ambiguous_even_in_different_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            patient = Path(directory)
+            inp = patient / "input"
+            inp.mkdir()
+            write_txt(inp / "genotype_export.txt")
+            write_txt(patient / "genotype_export.txt")
+            profile = gtp.detect(patient)
+            self.assertEqual(profile["kind"], gtp.UNKNOWN_KIND)
+            self.assertIsNone(profile["source_file"])
+            self.assertEqual(len(profile["txt_candidates"]), 2)
+
+    def test_unlabelled_genotype_table_is_not_silently_assigned_grch37(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            patient = Path(directory)
+            inp = patient / "input"
+            inp.mkdir()
+            (inp / "unlabelled.txt").write_text(
+                "# rsid\\tchromosome\\tposition\\tgenotype\\n"
+                + "".join(f"rs{i}\\t1\\t{i}\\tAA\\n" for i in range(1, 21)),
+                encoding="utf-8",
+            )
+            profile = gtp.detect(patient)
+            self.assertEqual(profile["kind"], gtp.UNKNOWN_KIND)
 
     def test_existing_array_profile_remains_owned_by_core_detector(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -139,6 +178,15 @@ class GenotypeTxtProfileTests(unittest.TestCase):
         self.assertIn("DanteGenotypeTxtOriginalSelectMode", source)
         self.assertIn('if (-not (Test-IsGenotypeTxtProfile))', source)
         self.assertIn('"--check-ref", "e"', source)
+        self.assertIn('"patient_root" { $sourceDirectory = $PatientRoot }', source)
+        generic_menu = (SRC / "vcf_export_runtime.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn('if ([string]$profile.kind -eq "UNKNOWN")', generic_menu)
+        self.assertIn('No supported VCF or unique GRCh37 genotype-table TXT', generic_menu)
+        wrapper = (SRC / "dante_wgs_pipeline.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn("DispatchGuardNeedle", wrapper)
+        self.assertIn('if ([string]$activeProfile.kind -eq "UNKNOWN")', wrapper)
+        self.assertIn('if ([string]$activeProfile.kind -eq "GENOTYPE_TABLE_TXT"', wrapper)
+        self.assertIn('"annotsv", "reference-targets"', wrapper)
 
     def test_txt_stage24_confidence_is_not_array_or_wgs_confidence(self) -> None:
         event = ke.PatientEvent("SNV_INDEL", "v1", {"CATALOG"}, "1", 100, 100, ref="A", alt="G")
